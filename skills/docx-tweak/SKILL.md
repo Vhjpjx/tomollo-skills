@@ -74,9 +74,26 @@ python -c "print(xml)"    ← 同理禁止
 
 ---
 
+## Git 版本管理（默认）
+
+解包后默认在解包目录中使用 git 管理每次修改，以便随时回退。具体流程见下方详细步骤中的**解包**和**编辑**环节。
+
+---
+
 ## 回滚
 
-回滚本质上就是**把 XML 文件恢复到之前的状态**。所有修改最终都体现在解包目录中的 XML 文件上（`document.xml`、`styles.xml` 等）。无论用什么方式（Claude Code 的 ESC-ESC undo、git、直接从 `.docx` 重新解包），最终做的事情都一样——让 XML 文件回到你想要的那个版本，然后重打包。
+回滚本质上就是**把 XML 文件恢复到之前的状态**。所有修改最终都体现在解包目录中的 XML 文件上（`document.xml`、`styles.xml` 等）。恢复旧版本后重打包即可。
+
+默认通过 git 实现：
+
+```bash
+cd "$CLAUDE_JOB_DIR/polish-work"
+git log --oneline           # 查看修改历史
+git diff --stat HEAD~1      # 查看最近一次改了什么（不打印 XML 内容）
+git checkout <hash> -- .    # 回滚到某次修改后的状态
+```
+
+不需要 git 时可直接从原始 .docx 重新解包。
 
 ---
 
@@ -110,11 +127,17 @@ python -c "print(xml)"    ← 同理禁止
 
 ### 2. 解包
 
-创建临时工作目录并解包:
+创建临时工作目录并解包，然后初始化 git 用于版本管理:
 
 ```bash
 mkdir -p "$CLAUDE_JOB_DIR/polish-work"
 unzip -o "/path/to/thesis.docx" -d "$CLAUDE_JOB_DIR/polish-work"
+
+# 初始化 git，记录每次修改以便回滚
+cd "$CLAUDE_JOB_DIR/polish-work"
+git init
+git add -A
+git commit -m "初始状态：解包后的原始文件"
 ```
 
 查看文档结构:
@@ -148,6 +171,14 @@ Read "$CLAUDE_JOB_DIR/polish-work/word/document.xml"
 ```
 
 ### 4. 编辑
+
+每次编辑完成后，用 git 提交当前修改，以便后续回滚:
+
+```bash
+cd "$CLAUDE_JOB_DIR/polish-work"
+git add -A
+git commit -m "修改：统一正文字体为宋体小四"
+```
 
 根据操作类型选择策略:
 
@@ -271,4 +302,5 @@ cp "$CLAUDE_JOB_DIR/thesis-polished.docx" "/path/to/output.docx"
 4. **合并 `<w:r>`** — 同一 <w:p> 内相邻 <w:r> 如果格式相同可以合并其中 <w:t> 内容，方便全文替换
 5. **中文编码** — 确保处理工具正确处理 UTF-8 编码
 6. **解包目录可复用** — 同一份文档的多次修改在同一个解包目录中增量进行，不需要重新解包。完成后可删除 `$CLAUDE_JOB_DIR/polish-work`
-7. **备份原文件** — 修改前先备份原始 .docx，需要时可直接重新解包恢复
+7. **Git 回滚** — 解包后默认用 git 管理修改记录，`git log --oneline` 查看历史，`git checkout <hash> -- .` 回滚
+8. **备份原文件** — 修改前先备份原始 .docx，不依赖 git 时可直接重新解包恢复
