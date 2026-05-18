@@ -55,6 +55,78 @@ python -c "print(xml)"    ← 同理禁止
 
 ---
 
+## 工作模式
+
+### 一次性解包，增量编辑
+
+**只解包一次，后续所有修改都在同一个解包目录中增量进行**，避免重复解包：
+
+```
+第 1 次: 解包 → 编辑 → 重打包（给用户查看）
+第 2 次:        → 编辑 → 重打包（增量修改）
+第 3 次:        → 编辑 → 重打包（继续增量）
+...
+```
+
+解包目录 `$CLAUDE_JOB_DIR/polish-work/` 就是"工作副本"，编辑对应 XML 文件后即可重打包。只有在处理全新的 .docx 文件时才需要重新解包。
+
+重打包产物是"快照"——每次重打包生成一个独立的 .docx 文件，用户确认后才会继续下一轮修改。
+
+### 使用 Git 管理修改历史（推荐）
+
+在解包目录中初始化 git，把每次修改作为一个 commit:
+
+```bash
+cd "$CLAUDE_JOB_DIR/polish-work"
+git init
+git add -A
+git commit -m "初始状态：解包后的原始文件"
+```
+
+每次编辑 XML 前先确认当前状态是干净的，编辑后提交:
+
+```bash
+git commit -am "修改：统一正文字体为宋体小四"
+```
+
+这样每次修改都有记录，可以方便地查看每次改了什么、回滚任意一步。
+
+---
+
+## 回滚
+
+### 方式一：查看修改历史
+
+```bash
+cd "$CLAUDE_JOB_DIR/polish-work"
+git log --oneline
+
+# 查看某次修改的具体 XML 改动（不打印 XML 完整内容，只显示 diff 摘要）
+git diff --stat <commit-hash>^!    ← 只看改了哪些文件
+```
+
+### 方式二：回滚到某次修改之前
+
+```bash
+cd "$CLAUDE_JOB_DIR/polish-work"
+git revert <commit-hash>            ← 安全回滚（产生新的 revert commit）
+# 或
+git reset --hard <commit-hash>^     ← 强硬回滚（丢弃之后的所有修改）
+```
+
+建议使用 `git revert`，它产生一个新的反做提交，不会丢失中间任何修改，可以再次 revert 来恢复。
+
+### 方式三：完全重来
+
+如果修改已经不可收拾，直接从原始 .docx 重新解包:
+
+```bash
+rm -rf "$CLAUDE_JOB_DIR/polish-work"
+unzip -o "/path/to/original.docx" -d "$CLAUDE_JOB_DIR/polish-work"
+```
+
+---
+
 ## 论文微调典型操作
 
 | 操作 | 说明 | 涉及 XML |
@@ -245,5 +317,5 @@ cp "$CLAUDE_JOB_DIR/thesis-polished.docx" "/path/to/output.docx"
 3. **命名空间属性** — 根标签的 `xmlns:w` 等命名空间声明不能丢失
 4. **合并 `<w:r>`** — 同一 <w:p> 内相邻 <w:r> 如果格式相同可以合并其中 <w:t> 内容，方便全文替换
 5. **中文编码** — 确保处理工具正确处理 UTF-8 编码
-6. **清理临时文件** — 完成后删除 `$CLAUDE_JOB_DIR/polish-work` 和临时输出文件
-7. **备份原文件** — 修改前先备份原始 .docx
+6. **解包目录可复用** — 同一份文档的多次修改在同一个解包目录中增量进行，不需要重新解包。完成后可删除 `$CLAUDE_JOB_DIR/polish-work`
+7. **备份原文件 + 使用 Git** — 在解包目录中初始化 git，每次编辑后提交，方便回滚。同时保留原始 .docx 的备份
