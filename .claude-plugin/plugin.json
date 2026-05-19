@@ -1,11 +1,15 @@
 {
   "name": "tomollo-skills",
   "description": "A collection of custom skills for Claude Code",
+<<<<<<< Updated upstream
   "version": "2.3.0",
+=======
+  "version": "3.0.0",
+>>>>>>> Stashed changes
   "author": {
     "name": "zzzyxxx"
   },
   "license": "MIT",
   "keywords": ["skills", "claude-code", "workflow", "docx"],
-  "skills": ["./skills/seedpeak", "./skills/docx-tweak"]
+  "skills": ["./skills/seedpeak", "./skills/docx-tweak", "./skills/iter-mini"]
 }
